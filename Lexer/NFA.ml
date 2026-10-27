@@ -1,93 +1,78 @@
 
-(*NFA = Non-deterministic finite automata - for string matching*)
-(*
-  These NFA functions are largely just implemented as a curiosity - in practice
-  they would be quite slow, at least for more nontrivial regexes, as they require a lot of
-  recursive backtracking.
-  Furthermore, because we use functions as opposed to the usual automata representation,
-  we cannot apply the usual optimization algorithms as there is no underlying state machine!
-  (Technically these aren't NFAs at all, just functions that mimic them)
-*)
+type nfa_state = int
 
-type nfa = {
-  (** The acceptor is a function that takes a string, indices i <= j, and returns true
-    iff the substring string[i...j] is accepted by this NFA
-    Rules for acceptor : 
-    If string is empty, i , j are ignored
-    If j < i, then we treat like the empty substring
-  *)
-  acceptor : string -> int -> int -> bool
+type nfa_transition_label =
+  | Empty (**epsilon transition*)
+  | Character of char (**single char transition*)
+  | CharRange of char * char (**all chars between start and end, inclusive*)
+  | CharList of char list  (**transition for each char in list*)
+
+type nfa_transition = {
+  from_state : nfa_state;
+  to_state : nfa_state;
+  label : nfa_transition_label;
 }
 
-(**Union - accepts any string which would be accepted by either nfa1 or nfa2*)
-let nfa_union nfa1 nfa2 =
-  {
-    acceptor = (fun str i  j -> 
-      nfa1.acceptor str i j ||
-      nfa2.acceptor str i j  
-    );
-  }
+(**Intermediate NFA meant for building other NFAs out of - not great for parsing*)
+type intermediate_nfa = {
+  start_state : nfa_state;
+  end_state : nfa_state;
 
-(**Concatenation - accepts any string of the form AB where nfa1 accepts A and nfa2 accepts B*)
-let nfa_concatenate nfa1 nfa2 =
-  {
-    acceptor = (fun str i j ->
-      (**for k = i-1 to j, check if nfa1 accepts str[i...k] and nfa2 accepts str[k + 1...j]*)
-      let rec rec_acceptor str k =
-        if k > j then
-          false
-        else if (nfa1.acceptor str i k && nfa2.acceptor str (k+1) j) then
-          true
-        else
-          rec_acceptor str (k+1)
-      in
-      rec_acceptor str (i-1)
-    );
-  }
+  (**All transitions in the NFA state machine*)
+  transitions : nfa_transition list
+}
 
-(**Kleene star operation - accepts 0 or more copies of any string accepted by the input nfa*)
-let nfa_kleene_star nfa =
-  (** The runtime on this could be horrendous!, but sub-exponential?*)
-  (** This could be improved through some kind of dynamic programming scheme*)
-  let rec kleene_star_acceptor str i j = 
-    (**Always accept the empty substring*)
-      if (String.length str) = 0 || (j < i) then
-        true
-      else
-        let rec rec_acceptor str k =
-          if k > j then
-            false
-          else if (nfa.acceptor str i k && kleene_star_acceptor str (k + 1) j) then
-            true
-          else
-            rec_acceptor str (k+1)
-        in
-        (**There's no point in starting at i-1 since the empty string can appear infinitely often*)
-        rec_acceptor str i
+(**Thompson's construction union - next_state contains the next available state we can add*)
+let nfa_union nfa1 nfa2 next_state =
+  let new_start = next_state in
+  let new_end = next_state + 1 in
+  let new_next_state = next_state + 2 in
+
+  let new_start_to_old_start_1 = {
+    from_state = new_start; 
+    to_state = nfa1.start_state;
+    label = Empty;
+  }
   in
-  {
-    acceptor = kleene_star_acceptor   
-  }
 
-let nfa_accepts_string nfa str =
-  nfa.acceptor str 0 (String.length str - 1)
-
-(**NFA that accepts only the single character c*)
-let single_char_nfa c =
-  {
-    (**Maybe don't need bounds checking*)
-    acceptor = (fun str i j ->
-      i = j && i >= 0 && String.length str > i && str.[i] = c
-    );
+  let new_start_to_old_start_2 = {
+    from_state = new_start; 
+    to_state = nfa2.start_state;
+    label = Empty;
   }
+  in
 
-(**NFA that only accepts the string target_str*)
-let string_nfa target_str = 
-  {
-    acceptor = (fun str i j ->
-      j - i + 1 == String.length target_str &&
-      i >= 0 &&
-      j < String.length str &&
-      String.sub str i (j - i + 1) = target_str 
-    );
+  let old_finish_1_to_new_finish = {
+    from_state = nfa1.end_state; 
+    to_state = new_end;
+    label = Empty;
   }
+  in
+
+  let old_finish_2_to_new_finish = {
+    from_state = nfa2.end_state; 
+    to_state = new_end;
+    label = Empty;
+  }
+  in
+
+  let new_transition_list = [
+                              new_start_to_old_start_1; 
+                              new_start_to_old_start_2;
+                              old_finish_1_to_new_finish; 
+                              old_finish_2_to_new_finish;   
+                            ]
+  in
+
+  let union_nfa =
+  {
+    start_state = new_start;
+    end_state = new_end;
+    transitions = new_transition_list @ nfa1.transitions @ nfa2.transitions
+  }
+  in
+  (union_nfa, new_next_state)
+
+
+
+
