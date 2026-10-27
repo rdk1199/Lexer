@@ -1,5 +1,6 @@
-
 type nfa_state = int
+
+module TransitionMap = Map.Make(Int)
 
 type nfa_transition_label =
   | Empty (**epsilon transition*)
@@ -22,8 +23,16 @@ type intermediate_nfa = {
   transitions : nfa_transition list
 }
 
+(**NFA for string matching - constructed from intermediate_nfa once operations are done*)
+type nfa = {
+  start_state : nfa_state;
+  end_state : nfa_state;
+
+  transition_map : (nfa_transition list) TransitionMap.t;
+}
+
 (**Thompson's construction union - next_state contains the next available state we can add*)
-let nfa_union nfa1 nfa2 next_state =
+let nfa_union  (nfa1 : intermediate_nfa) (nfa2 : intermediate_nfa) next_state =
   let new_start = next_state in
   let new_end = next_state + 1 in
   let new_next_state = next_state + 2 in
@@ -75,7 +84,7 @@ let nfa_union nfa1 nfa2 next_state =
 
 (**Thompson's construction concatenation - next_state contains the next available state we can add*)
 (**ASSUMES the operands' state sets are disjoint*)
-let nfa_concat nfa1 nfa2 next_state =
+let nfa_concat (nfa1 : intermediate_nfa) (nfa2 : intermediate_nfa) next_state =
   let new_transition = {
     from_state = nfa1.end_state;
     to_state = nfa2.start_state;
@@ -96,7 +105,7 @@ let nfa_concat nfa1 nfa2 next_state =
 
 
 (**Thompson's construction Kleene star - next_state contains the next available state we can add*)
-let nfa_star nfa next_state = 
+let nfa_star (nfa : intermediate_nfa) next_state = 
   let new_start = next_state in
   let new_end = next_state + 1 in
 
@@ -144,3 +153,78 @@ let nfa_star nfa next_state =
   }
   in
   (star_nfa, next_state + 2)
+
+let finalize_nfa intermediate_nfa =
+  let empty_transition_map = TransitionMap.empty in
+  let final_transition_map = List.fold_left (fun curr_map transition -> 
+    let from_state = transition.from_state in
+    match TransitionMap.find_opt from_state curr_map  with
+    | Some transition_list -> 
+      TransitionMap.add from_state (transition :: transition_list) (TransitionMap.remove from_state curr_map)
+    | None ->
+      TransitionMap.add from_state [transition] curr_map
+  ) empty_transition_map intermediate_nfa.transitions
+  in
+  {
+    start_state = intermediate_nfa.start_state;
+    end_state = intermediate_nfa.end_state;
+    transition_map = final_transition_map;
+  }
+
+(**nfa for accepting a single char*)
+let char_nfa c next_state =
+  let start_state = next_state in
+  let end_state = next_state + 1 in
+  let new_next_state = next_state + 2 in
+
+  let transition = {
+    from_state = start_state;
+    to_state = end_state;
+    label = Character c
+  }
+  in
+
+  let final_nfa = 
+  {
+    start_state = start_state;
+    end_state = end_state;
+    transitions = [transition];
+  }
+  in
+  (final_nfa, new_next_state)
+
+(**nfa that only accepts str*)
+let string_nfa str next_state = 
+  let start_state = next_state in
+  let next_state_1 = next_state + 1 in
+
+  (**recursively build a path NFA*)
+  let rec build_string_nfa str i prev_state next_state transition_list =
+    if i >= String.length str then
+      (**
+        We are done - final next state is next_state, prev_state is the final state
+        of the whole string NFA, and all transitions are in transition_list
+      *)
+      (prev_state, next_state, transition_list)
+    else
+      let new_state = next_state in
+      let next_next_state = next_state + 1 in
+      let new_transition = {
+        from_state = prev_state;
+        to_state = new_state;
+        label = Character str.[i]
+      }
+      in
+      build_string_nfa str (i+1) new_state next_next_state (new_transition :: transition_list)
+  in
+  let (final_state, final_next_state, transition_list) = build_string_nfa str 0 start_state next_state_1 [] in
+  let final_nfa = 
+  {
+    start_state = start_state;
+    end_state = final_state;
+    transitions = transition_list;
+  }
+  in
+  (final_nfa, final_next_state)
+
+
