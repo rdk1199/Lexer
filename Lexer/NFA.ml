@@ -37,6 +37,9 @@ type intermediate_nfa = {
   transitions : nfa_transition list
 }
 
+let add_transition intermediate_nfa transition =
+  {intermediate_nfa with transitions = transition :: intermediate_nfa.transitions}
+
 (**NFA for string matching - constructed from intermediate_nfa once operations are done*)
 type nfa = {
   start_state : nfa_state;

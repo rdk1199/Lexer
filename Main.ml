@@ -5,8 +5,6 @@ let test_acceptor = string_acceptor "test"
 
 let kleene_star_test_acceptor = acceptor_kleene_star test_acceptor
 
-
-
 let () =
   assert (acceptor_accepts_string kleene_star_test_acceptor "testtesttesttest");
   assert (acceptor_accepts_string kleene_star_test_acceptor "");
