@@ -14,6 +14,20 @@ type nfa_transition = {
   label : nfa_transition_label;
 }
 
+let transition_is_empty transition =
+  match transition.label with
+  | Empty -> true
+  | _ -> false
+
+(**Returns whether transition accepts char and, 
+if so, the number of characters it accepts (0 in case of empty transition, 1 otherwise)*)
+let transition_accepts_char transition c =
+  match transition.label with
+  | Empty -> (true, 0)
+  | Character ch -> (c = ch, 1)
+  | CharRange (ch_start, ch_end) -> (ch_start <= c && c <= ch_end, 1)
+  | CharList ch_list -> (List.mem c ch_list, 1)
+
 (**Intermediate NFA meant for building other NFAs out of - not great for parsing*)
 type intermediate_nfa = {
   start_state : nfa_state;
@@ -30,6 +44,44 @@ type nfa = {
 
   transition_map : (nfa_transition list) TransitionMap.t;
 }
+
+(**Use recursive backtracking to feed string through the NFA - not particularly efficient*)
+let rec nfa_accepts_str nfa str =
+  (**true if nfa starting from state curr_state accepts suffix of str starting at index i *)
+  let rec nfa_state_accepts_suffix nfa str i curr_state =
+    let opt_transition_list = TransitionMap.find_opt curr_state nfa.transition_map in
+    if i >= String.length str then
+      if curr_state = nfa.end_state then 
+        true
+      else
+        match opt_transition_list with
+        | None -> false
+        | Some transition_list ->
+          List.fold_left (fun acc transition ->
+            acc ||
+            if transition_is_empty transition then
+              nfa_state_accepts_suffix nfa str i transition.to_state
+            else
+              false
+          ) false transition_list
+
+    else
+      let next_char = str.[i] in
+      match opt_transition_list with
+      | None -> false
+      | Some transition_list ->
+        List.fold_left (fun acc transition -> 
+          acc ||
+          let (accepts, num_accepted) = transition_accepts_char transition next_char in
+          if accepts then
+            nfa_state_accepts_suffix nfa str (i + num_accepted) transition.to_state
+          else
+            false
+    ) false transition_list
+  in
+  nfa_state_accepts_suffix nfa str 0 nfa.start_state
+
+
 
 (**Thompson's construction union - next_state contains the next available state we can add*)
 let nfa_union  (nfa1 : intermediate_nfa) (nfa2 : intermediate_nfa) next_state =
