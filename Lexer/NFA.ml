@@ -37,6 +37,13 @@ type intermediate_nfa = {
   transitions : nfa_transition list
 }
 
+(**NFA accepting no strings*)
+let empty_intermediate_nfa = {
+  start_state = 0;
+  end_state = -1;
+  transitions = [];
+}
+
 let add_transition intermediate_nfa transition =
   {intermediate_nfa with transitions = transition :: intermediate_nfa.transitions}
 
@@ -137,9 +144,9 @@ let nfa_union  (nfa1 : intermediate_nfa) (nfa2 : intermediate_nfa) next_state =
   in
   (union_nfa, new_next_state)
 
-(**Thompson's construction concatenation - next_state contains the next available state we can add*)
+(**Thompson's construction concatenation - no new states needed*)
 (**ASSUMES the operands' state sets are disjoint*)
-let nfa_concat (nfa1 : intermediate_nfa) (nfa2 : intermediate_nfa) next_state =
+let nfa_concat (nfa1 : intermediate_nfa) (nfa2 : intermediate_nfa) =
   let new_transition = {
     from_state = nfa1.end_state;
     to_state = nfa2.start_state;
@@ -154,9 +161,7 @@ let nfa_concat (nfa1 : intermediate_nfa) (nfa2 : intermediate_nfa) next_state =
     transitions = [new_transition] @ nfa1.transitions @ nfa2.transitions;
   }
   in
-
-  (**no new states created, so next_state stays the same*)
-  (concat_nfa, next_state)
+  concat_nfa
 
 
 (**Thompson's construction Kleene star - next_state contains the next available state we can add*)
