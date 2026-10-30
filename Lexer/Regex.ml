@@ -11,6 +11,7 @@ let transition_for_char_range from_state to_state c_start c_end =
 
 let transition_for_all_chars from_state to_state =
   let open NFA in
+  (*match everything past new line (in ASCII)*)
   {from_state = from_state; to_state = to_state; label = CharRange (char_of_int 11, char_of_int 127);}
 
 (**Add a char transition from start_state->end_state in an NFA*)
@@ -119,7 +120,7 @@ let rec reverse_concatenate_list nfa_list =
     let tail_concat = reverse_concatenate_list tail in
     match tail_concat with
     | None -> Some nfa
-    | Some tail_nfa -> Some (NFA.nfa_concat nfa tail_nfa)
+    | Some tail_nfa -> Some (NFA.nfa_concat tail_nfa nfa)
 
 let finalize_list nfa_list = 
   let open NFA in
@@ -128,16 +129,20 @@ let finalize_list nfa_list =
   | None -> empty_intermediate_nfa
   | Some nfa -> nfa
 
+
 (**Takes a POSIX basic regex string and produces an equivalent NFA*)
 let parse_regex_string regex =
   (**Recursively parse regex with i as the next character - nfa_list is list of nfas from previous parsing, most recent first*)
-  (**Note that we could be parsing a subexpression, so we stop if we hit a ')' and return the index past the )
+  (**Note that we could be parsing a subexpression, so we stop if we hit a ')' and return the index of the )
     or index past the end of the string if we are there - also return the next nfa state!*)
   let rec parse_regex_string_rec regex i nfa_list next_nfa_state =
     if i >= String.length regex || (regex.[i] = ')') then
+      begin
       (**we are done*)
-      ((finalize_list nfa_list), i + 1, next_nfa_state)
+      ((finalize_list nfa_list), i, next_nfa_state)
+      end
     else
+      begin
       let next_char = regex.[i] in
       match next_char with
       | '.' ->
@@ -151,8 +156,8 @@ let parse_regex_string regex =
         parse_regex_string_rec regex (i+1) (star_nfa :: List.tl nfa_list) new_next_nfa_state
       | '(' ->
         (**This is the start of a sub-expression - parse and return*)
-        let sub_nfa, next_index, new_next_nfa_state = parse_regex_string_rec regex (i+1) [] next_nfa_state in
-        parse_regex_string_rec regex next_index (sub_nfa :: nfa_list) new_next_nfa_state
+        let sub_nfa, sub_nfa_end_index, new_next_nfa_state = parse_regex_string_rec regex (i+1) [] next_nfa_state in
+        parse_regex_string_rec regex (sub_nfa_end_index + 1) (sub_nfa :: nfa_list) new_next_nfa_state
       | '|' ->
         (**Union -> compress the accumulated list so far and take union with what remains*)
         (**Not tail recursive :( *)
@@ -160,9 +165,16 @@ let parse_regex_string regex =
         let remaining_nfa, next_index, new_next_nfa_state = parse_regex_string_rec regex (i+1) [] next_nfa_state in
         let union_nfa, new_new_next_nfa_state = NFA.nfa_union finalized_nfa_section remaining_nfa new_next_nfa_state in
         parse_regex_string_rec regex next_index [union_nfa;] new_new_next_nfa_state
+      | '\\' ->
+        (**escape - just add next character, since in our case every escaped character just corresponds to itself (i.e. \[ -> '[' )
+         We assume a valid input so no additional checking is needed and continue parsing at the one after it*)
+        let char_nfa, new_next_nfa_state = nfa_for_char (regex.[i+1]) next_nfa_state in
+        parse_regex_string_rec regex (i+2) (char_nfa :: nfa_list) new_next_nfa_state
       | c ->
+        (**default*)
         let char_nfa, new_next_nfa_state = nfa_for_char c next_nfa_state in
         parse_regex_string_rec regex (i+1) (char_nfa :: nfa_list) new_next_nfa_state
+      end
   in
 
   let nfa, _ , _ = parse_regex_string_rec regex 0 [] 0 in

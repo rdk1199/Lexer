@@ -8,11 +8,27 @@ type nfa_transition_label =
   | CharRange of char * char (**all chars between start and end, inclusive*)
   | CharList of char list  (**transition for each char in list*)
 
+let string_of_nfa_transition_label label =
+  match label with
+  | Empty -> "empty"
+  | Character c -> String.of_char c
+  | CharRange (c_start, c_end) -> (String.of_char c_start) ^ "-" ^ (String.of_char c_end)
+  | CharList c_list ->
+    List.fold_left (fun acc_str c ->
+      acc_str ^ " " ^ (String.of_char c)
+    ) "" c_list
+
 type nfa_transition = {
   from_state : nfa_state;
   to_state : nfa_state;
   label : nfa_transition_label;
 }
+
+let string_of_nfa_transition transition =
+  string_of_int transition.from_state ^ "---" ^
+  (string_of_nfa_transition_label transition.label) ^ "-->" ^
+  string_of_int transition.to_state
+
 
 let transition_is_empty transition =
   match transition.label with
@@ -54,6 +70,26 @@ type nfa = {
 
   transition_map : (nfa_transition list) TransitionMap.t;
 }
+
+let string_of_nfa nfa =
+  let states_string = 
+  "start_state: " ^ (string_of_int nfa.start_state) ^ "\n" ^
+  "end_state: " ^ (string_of_int nfa.end_state) ^ "\n"
+  in
+
+  let map_string = TransitionMap.fold (fun state transition_list acc ->
+    acc ^
+    "state: " ^ (string_of_int state) ^ "\n" ^
+    "transitions: " ^ 
+    (
+      List.fold_left ( fun acc_str transition ->
+        acc_str ^ " " ^ (string_of_nfa_transition transition) ^ ", "
+      ) "" transition_list
+    ) ^ "\n"
+    ) nfa.transition_map ""
+  in
+  states_string ^ map_string
+
 
 (**Use recursive backtracking to feed string through the NFA - not particularly efficient*)
 let rec nfa_accepts_str nfa str =
