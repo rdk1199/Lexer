@@ -90,43 +90,45 @@ let string_of_nfa nfa =
   in
   states_string ^ map_string
 
+(**Feed a string through an NFA starting from index i and get the maximum length that will be accepted*)
+(**Returns length, so if j is returned then up to i + j - 1 is accepted*)
+let get_longest_nfa_match nfa str i =
+  (*j = index in the string to check NEXT (not yet processed), current_max = length of longest accepted prefix*)
+  let rec get_longest_nfa_match_rec nfa str j current_max curr_state =
 
-(**Use recursive backtracking to feed string through the NFA - not particularly efficient*)
-let rec nfa_accepts_str nfa str =
-  (**true if nfa starting from state curr_state accepts suffix of str starting at index i *)
-  let rec nfa_state_accepts_suffix nfa str i curr_state =
+    (**if we are in the final state, then the string "[i,j)" was accepted, so get a new max*)
+    let new_max = if curr_state = nfa.end_state then Int.max (j-i) current_max else current_max in
     let opt_transition_list = TransitionMap.find_opt curr_state nfa.transition_map in
-    if i >= String.length str then
-      if curr_state = nfa.end_state then 
-        true
-      else
-        match opt_transition_list with
-        | None -> false
-        | Some transition_list ->
-          List.fold_left (fun acc transition ->
-            acc ||
-            if transition_is_empty transition then
-              nfa_state_accepts_suffix nfa str i transition.to_state
+  
+    match opt_transition_list with
+    (**Nowhere to proceed - the best so far is what we return*)
+    | None -> new_max
+    | Some transition_list ->
+      List.fold_left (fun acc transition ->
+          let (accepts, num_accepted) = 
+            (**If there is a next char to process, we can proceed down any accepting transition*)
+            (**Otherwise, only proceed down empty ones*)
+            if j < String.length str then
+               transition_accepts_char transition str.[j]
             else
-              false
-          ) false transition_list
-
-    else
-      let next_char = str.[i] in
-      match opt_transition_list with
-      | None -> false
-      | Some transition_list ->
-        List.fold_left (fun acc transition -> 
-          acc ||
-          let (accepts, num_accepted) = transition_accepts_char transition next_char in
+              (transition_is_empty transition, 0)
+          in
           if accepts then
-            nfa_state_accepts_suffix nfa str (i + num_accepted) transition.to_state
+            Int.max acc
+            (get_longest_nfa_match_rec nfa str (j + num_accepted) new_max transition.to_state)
           else
-            false
-    ) false transition_list
+            acc
+      ) new_max transition_list
   in
-  nfa_state_accepts_suffix nfa str 0 nfa.start_state
+  get_longest_nfa_match_rec nfa str i 0 nfa.start_state 
 
+
+let nfa_accepts_str nfa str = 
+  let length = String.length str in
+  if length = 0 then
+    nfa.start_state = nfa.end_state
+  else
+    (get_longest_nfa_match nfa str 0) = (String.length str)
 
 
 (**Thompson's construction union - next_state contains the next available state we can add*)

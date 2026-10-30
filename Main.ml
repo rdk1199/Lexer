@@ -104,8 +104,6 @@ let () = expect_reject_all test_nfa_5 test_regex_5 [
 let test_regex_7 = "a(c|d)|e"
 let test_nfa_7 = parse_regex_string test_regex_7
 
-let () = print_endline (string_of_nfa test_nfa_7)
-
 let () = expect_accept_all test_nfa_7 test_regex_7 [
   "ac";
   "ad";
@@ -121,8 +119,6 @@ let () = expect_reject_all test_nfa_7 test_regex_7 [
 
 let test_regex_6 = "ab(c|d)([e-g]|(hi.[t-x]*z)*)|56346"
 let test_nfa_6 = parse_regex_string test_regex_6
-
-let () = print_endline (string_of_nfa test_nfa_6)
 
 let () = expect_accept_all test_nfa_6 test_regex_6 [
   "56346";
@@ -142,5 +138,17 @@ let () = expect_reject_all test_nfa_6 test_regex_6 [
   "abchiqyz";
 ]
 
+let test_regex_8 = "((((c))))"
+let test_nfa_8 = parse_regex_string test_regex_8
+
+let () = expect_accept_all test_nfa_8 test_regex_8 [
+  "c";
+]
+
+let () = expect_reject_all test_nfa_8 test_regex_8 [
+  ")";
+  "";
+  "(";
+]
 
 let () = print_endline "Regex->NFA tests passed!"

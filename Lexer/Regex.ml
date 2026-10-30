@@ -157,6 +157,7 @@ let parse_regex_string regex =
       | '(' ->
         (**This is the start of a sub-expression - parse and return*)
         let sub_nfa, sub_nfa_end_index, new_next_nfa_state = parse_regex_string_rec regex (i+1) [] next_nfa_state in
+        (**start parsing after this subexpression*)
         parse_regex_string_rec regex (sub_nfa_end_index + 1) (sub_nfa :: nfa_list) new_next_nfa_state
       | '|' ->
         (**Union -> compress the accumulated list so far and take union with what remains*)
@@ -164,6 +165,7 @@ let parse_regex_string regex =
         let finalized_nfa_section = finalize_list nfa_list in
         let remaining_nfa, next_index, new_next_nfa_state = parse_regex_string_rec regex (i+1) [] next_nfa_state in
         let union_nfa, new_new_next_nfa_state = NFA.nfa_union finalized_nfa_section remaining_nfa new_next_nfa_state in
+        (**next index is the end of our current regex expression - either a ) or past the string - just pass it through*)
         parse_regex_string_rec regex next_index [union_nfa;] new_new_next_nfa_state
       | '\\' ->
         (**escape - just add next character, since in our case every escaped character just corresponds to itself (i.e. \[ -> '[' )
