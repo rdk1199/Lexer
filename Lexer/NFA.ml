@@ -90,6 +90,32 @@ let string_of_nfa nfa =
   in
   states_string ^ map_string
 
+
+(**Traverse all the empty transitions to see if there is a path to the final state*)
+(**Note that an evil NFA could probably get this to loop forever, as is true of the other string matching functions*)
+(**However, an NFA constructed through regex parsing should not allow that*)
+(**This could be prevented with a visited list or even just depth limit, but it's OK*)
+let rec nfa_accepts_empty_str nfa =
+  (**true if nfa starting from state curr_state accepts empty string *)
+  let rec nfa_state_accepts_empty nfa curr_state = 
+    if curr_state = nfa.end_state then 
+      true
+    else
+      let opt_transition_list = TransitionMap.find_opt curr_state nfa.transition_map in
+      match opt_transition_list with
+      | None -> false
+      | Some transition_list ->
+        List.fold_left (fun acc transition ->
+          acc ||
+          if transition_is_empty transition then
+            nfa_state_accepts_empty nfa transition.to_state
+          else
+            false
+        ) false transition_list
+
+  in
+  nfa_state_accepts_empty nfa nfa.start_state
+
 (**Feed a string through an NFA starting from index i and get the maximum length that will be accepted*)
 (**Returns length, so if j is returned then up to i + j - 1 is accepted*)
 let get_longest_nfa_match nfa str i =
@@ -126,7 +152,7 @@ let get_longest_nfa_match nfa str i =
 let nfa_accepts_str nfa str = 
   let length = String.length str in
   if length = 0 then
-    nfa.start_state = nfa.end_state
+    nfa_accepts_empty_str nfa
   else
     (get_longest_nfa_match nfa str 0) = (String.length str)
 

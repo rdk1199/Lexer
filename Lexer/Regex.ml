@@ -129,6 +129,18 @@ let finalize_list nfa_list =
   | None -> empty_intermediate_nfa
   | Some nfa -> nfa
 
+(**\ is an escape character -> map the next character to the appropriate literal character*)
+(**i is the index of the \ *)
+(**Note we assume valid input, so there must be a char after \ in str*)
+let unescape_char str i = 
+  let next_char = str.[i+1] in
+  match next_char with
+  | 'n' -> '\n'
+  | 't' -> '\t'
+  | 'r' -> '\r'
+  | c -> c
+
+
 
 (**Takes a POSIX basic regex string and produces an equivalent NFA*)
 let parse_regex_string regex =
@@ -170,7 +182,9 @@ let parse_regex_string regex =
       | '\\' ->
         (**escape - just add next character, since in our case every escaped character just corresponds to itself (i.e. \[ -> '[' )
          We assume a valid input so no additional checking is needed and continue parsing at the one after it*)
-        let char_nfa, new_next_nfa_state = nfa_for_char (regex.[i+1]) next_nfa_state in
+        let unescaped_char = unescape_char regex i in
+        let char_nfa, new_next_nfa_state = nfa_for_char unescaped_char next_nfa_state in
+        (**skip over this backslash and the char after it, since we processed them both*)
         parse_regex_string_rec regex (i+2) (char_nfa :: nfa_list) new_next_nfa_state
       | c ->
         (**default*)

@@ -136,6 +136,7 @@ let () = expect_reject_all test_nfa_6 test_regex_6 [
   "abcl";
   "abchiz";
   "abchiqyz";
+  "abdghiptuvwxtwxzhiptwxtuvz";
 ]
 
 let test_regex_8 = "((((c))))"
@@ -148,6 +149,27 @@ let () = expect_accept_all test_nfa_8 test_regex_8 [
 let () = expect_reject_all test_nfa_8 test_regex_8 [
   ")";
   "";
+  "(";
+]
+
+let test_regex_9 = "(\\\\|\\n|\\r|\\t| )*"
+
+let test_nfa_9 = parse_regex_string test_regex_9
+
+let () = expect_accept_all test_nfa_9 test_regex_9 [
+  " ";
+  "\\";
+  "\n";
+  "\r";
+  "\t";
+  "\n\t\r\\ ";
+  "";
+]
+
+let () = expect_reject_all test_nfa_9 test_regex_9 [
+  "a";
+  "|";
+  ")";
   "(";
 ]
 
