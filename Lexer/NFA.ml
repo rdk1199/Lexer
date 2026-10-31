@@ -1,6 +1,8 @@
 type nfa_state = int
 
 module TransitionMap = Map.Make(Int)
+module StateMap = Map.Make(Int)
+module StateSet = Set.Make(Int)
 
 type nfa_transition_label =
   | Empty (**epsilon transition*)
@@ -90,6 +92,52 @@ let string_of_nfa nfa =
   in
   states_string ^ map_string
 
+
+(**Find the epsilon closure of a state in the nfa*)
+let build_epsilon_closure_for_state nfa nfa_state =
+  let rec build_epsilon_closure_rec nfa nfa_state state_set =
+      let new_set = StateSet.add nfa_state state_set in
+      let new_state = ((StateSet.cardinal new_set) = (StateSet.cardinal state_set)) in
+      if new_state then
+        let opt_transition_list = TransitionMap.find_opt nfa_state nfa.transition_map in
+        match opt_transition_list with
+        | None -> new_set
+        | Some transition_list ->
+          List.fold_left (fun acc_set transition ->
+            if transition_is_empty transition then
+              StateSet.union acc_set (build_epsilon_closure_rec nfa transition.to_state new_set)
+            else
+              acc_set
+            ) new_set transition_list
+      else
+        (**We have already processed this state - don't traverse*)
+        new_set
+  in
+  build_epsilon_closure_rec nfa nfa_state StateSet.empty
+
+let get_all_nfa_states nfa =
+  let rec get_states_rec nfa state state_set =
+    if StateSet.mem state state_set then
+      (*already traversed this state - return*)
+      state_set
+    else
+      let new_set = StateSet.add state state_set in
+      let opt_transition_list = TransitionMap.find_opt state nfa.transition_map in
+      match opt_transition_list with
+      | None -> new_set
+      | Some transition_list ->
+        List.fold_left (fun acc_set transition ->
+          StateSet.union acc_set (get_states_rec nfa transition.to_state new_set)  
+        ) new_set transition_list
+  in
+  StateSet.to_list (get_states_rec nfa nfa.start_state StateSet.empty)
+
+(*Returns a map state->epsilon closure*)
+let compute_all_epsilon_closures nfa = 
+  let state_list = get_all_nfa_states nfa in
+  List.fold_left (fun acc state ->
+    StateMap.add state (build_epsilon_closure_for_state nfa state) acc
+  ) StateMap.empty state_list
 
 (**Traverse all the empty transitions to see if there is a path to the final state*)
 (**Note that an evil NFA could probably get this to loop forever, as is true of the other string matching functions*)
@@ -294,6 +342,34 @@ let finalize_nfa intermediate_nfa =
     end_state = intermediate_nfa.end_state;
     transition_map = final_transition_map;
   }
+
+(*Takes an intermediate nfa and produces an equivalent nfa with no epsilon transitions except at the very end 
+(so we can have only one final state)*)(*
+let remove_all_epsilon_transitions intermediate_nfa =
+  let finalized_nfa = finalize_nfa intermediate_nfa in
+  let to_epsilon_closure_map = compute_all_epsilon_closures finalized_nfa in
+  let state_list = get_all_nfa_states finalized_nfa in
+
+  (**iterate over all non-empty transitions in the nfa*)
+  List.fold_left (fun acc_nfa transition
+    if transition_is_empty transition then
+      acc_nfa
+    else
+    (**iterate over the epsilon closure of the from_state*)
+    List.fold_left (fun acc_nfa from_epsilon_state ->
+      (**iterate over the epsilon closure of the to_state*)
+      List.fold_left (fun acc_nfa to_epsilon_state -> 
+        add_transition acc_nfa 
+        {
+          from_state = from_epsilon_state;
+          to_state = to_epsilon_state;
+          label = transition.label;
+        }        
+      )
+    )  transition.to_state
+  )
+*)
+
 
 (**nfa for accepting a single char*)
 let char_nfa c next_state =
