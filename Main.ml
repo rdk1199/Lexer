@@ -57,6 +57,8 @@ let () =
 
 let test_nfa_3 = parse_regex_string "a*b"
 
+let () = print_endline (string_of_nfa test_nfa_3) 
+
 let () = expect_accept_all test_nfa_3 "a*b" [
   "b";
   "ab";
@@ -73,6 +75,8 @@ let () = expect_reject_all test_nfa_3 "a*b" [
   "cb"
 ]
 
+let () = print_endline "test 3 passed!"
+
 let test_regex_4 = "dog|cat"
 let test_nfa_4 = parse_regex_string test_regex_4
 
@@ -88,6 +92,8 @@ let () = expect_reject_all test_nfa_4 test_regex_4 [
   "dogcat"
 ]
 
+let () = print_endline "test 4 passed!"
+
 let test_regex_5 = "dog\\|cat"
 let test_nfa_5 = parse_regex_string test_regex_5
 
@@ -100,6 +106,8 @@ let () = expect_reject_all test_nfa_5 test_regex_5 [
   "";
   "cat"
 ]
+
+let () = print_endline "test 5 passed!"
 
 let test_regex_7 = "a(c|d)|e"
 let test_nfa_7 = parse_regex_string test_regex_7
@@ -116,6 +124,7 @@ let () = expect_reject_all test_nfa_7 test_regex_7 [
   "";
 ]
  
+let () = print_endline "test 6 passed!"
 
 let test_regex_6 = "ab(c|d)([e-g]|(hi.[t-x]*z)*)|56346"
 let test_nfa_6 = parse_regex_string test_regex_6
@@ -139,6 +148,8 @@ let () = expect_reject_all test_nfa_6 test_regex_6 [
   "abdghiptuvwxtwxzhiptwxtuvz";
 ]
 
+let () = print_endline "test 7 passed!"
+
 let test_regex_8 = "((((c))))"
 let test_nfa_8 = parse_regex_string test_regex_8
 
@@ -151,6 +162,8 @@ let () = expect_reject_all test_nfa_8 test_regex_8 [
   "";
   "(";
 ]
+
+let () = print_endline "test 8 passed!"
 
 let test_regex_9 = "(\\\\|\\n|\\r|\\t| )*"
 
@@ -172,5 +185,7 @@ let () = expect_reject_all test_nfa_9 test_regex_9 [
   ")";
   "(";
 ]
+
+let () = print_endline "test 9 passed!"
 
 let () = print_endline "Regex->NFA tests passed!"
