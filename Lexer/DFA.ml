@@ -50,12 +50,13 @@ let state_has_transition (nfa : NFA.nfa) state transition_label =
 
 
 (**Get list of subsets that are reachable from this subset via some transition*)
-let get_reachable_subsets nfa state_set =
+let get_reachable_subsets nfa state_set epsilon_closure_map =
   let transition_label_set = get_transition_label_set nfa state_set in
   (**iterate over each unique transition label*)
   NFA.LabelSet.fold ( fun label acc_reached_subsets -> 
-    (
+    
     (**iterate over all states, accumulate subset reachable from the original subset via this transition label*)
+    let init_subset = 
     NFA.StateSet.fold (fun state acc_subset ->
       let (has_transition, to_state) = state_has_transition nfa state label in
       if has_transition then
@@ -63,7 +64,9 @@ let get_reachable_subsets nfa state_set =
       else
         acc_subset
     ) state_set NFA.StateSet.empty
-    ) :: acc_reached_subsets
+    in
+    (**get epsilon closure of the set*)
+    (NFA.compute_epsilon_closure_of_set init_subset epsilon_closure_map) :: acc_reached_subsets
   ) transition_label_set []
 
 
@@ -78,7 +81,7 @@ let construct_dfa nfa =
     let potential_new_new_sets = 
     (**iterate over all new sets*)
     List.fold_left (fun acc_new_subsets subset -> 
-      let reachable_from_this_subset = get_reachable_subsets nfa subset in
+      let reachable_from_this_subset = get_reachable_subsets nfa subset epsilon_closure_map in
       reachable_from_this_subset @ acc_new_subsets
     ) [] new_set_list
     in
@@ -103,4 +106,6 @@ let construct_dfa nfa =
     else
       construct_subset_states nfa epsilon_closure_map new_current_finished_set_list new_new_sets
   in
-construct_subset_states nfa epsilon_closure_map [] [initial_set]
+
+  let subset_states = construct_subset_states nfa epsilon_closure_map [] [initial_set] in
+  subset_states

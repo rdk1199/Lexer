@@ -158,7 +158,7 @@ let compute_all_epsilon_closures nfa =
   ) StateMap.empty state_list
 
 (**given a state subset and the map of each state to its epsilon closure, return epsilon closure of the subset*)
-let compute_epsilon_closure state_set epsilon_closure_map =
+let compute_epsilon_closure_of_set state_set epsilon_closure_map =
   (**For each state in the state_set*)
   StateSet.fold (fun state acc_set_epsilon_closure  ->
     let state_epsilon_closure_opt = StateMap.find_opt state epsilon_closure_map in
