@@ -193,5 +193,6 @@ let parse_regex_string regex =
       end
   in
 
-  let nfa, _ , _ = parse_regex_string_rec regex 0 [] 0 in
-  NFA.finalize_nfa nfa
+  let nfa, _ , next_nfa_state = parse_regex_string_rec regex 0 [] 0 in
+  let no_epsilon_nfa, _ = NFA.remove_all_epsilon_transitions nfa next_nfa_state in
+  NFA.finalize_nfa no_epsilon_nfa

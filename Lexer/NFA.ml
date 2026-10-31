@@ -97,7 +97,7 @@ let string_of_nfa nfa =
 let build_epsilon_closure_for_state nfa nfa_state =
   let rec build_epsilon_closure_rec nfa nfa_state state_set =
       let new_set = StateSet.add nfa_state state_set in
-      let new_state = ((StateSet.cardinal new_set) = (StateSet.cardinal state_set)) in
+      let new_state = ((StateSet.cardinal new_set) > (StateSet.cardinal state_set)) in
       if new_state then
         let opt_transition_list = TransitionMap.find_opt nfa_state nfa.transition_map in
         match opt_transition_list with
@@ -113,7 +113,8 @@ let build_epsilon_closure_for_state nfa nfa_state =
         (**We have already processed this state - don't traverse*)
         new_set
   in
-  build_epsilon_closure_rec nfa nfa_state StateSet.empty
+  StateSet.to_list (build_epsilon_closure_rec nfa nfa_state StateSet.empty)
+
 
 let get_all_nfa_states nfa =
   let rec get_states_rec nfa state state_set =
@@ -344,33 +345,72 @@ let finalize_nfa intermediate_nfa =
   }
 
 (*Takes an intermediate nfa and produces an equivalent nfa with no epsilon transitions except at the very end 
-(so we can have only one final state)*)(*
-let remove_all_epsilon_transitions intermediate_nfa =
+(so we can have only one final state)*)
+let remove_all_epsilon_transitions intermediate_nfa next_state =
   let finalized_nfa = finalize_nfa intermediate_nfa in
   let to_epsilon_closure_map = compute_all_epsilon_closures finalized_nfa in
-  let state_list = get_all_nfa_states finalized_nfa in
 
-  (**iterate over all non-empty transitions in the nfa*)
-  List.fold_left (fun acc_nfa transition
+  (**iterate over all non-empty transitions in the nfa and produce new transition list*)
+  let new_transition_list =
+  List.fold_left (fun acc_transition_list transition ->
     if transition_is_empty transition then
-      acc_nfa
+      acc_transition_list
     else
     (**iterate over the epsilon closure of the from_state*)
-    List.fold_left (fun acc_nfa from_epsilon_state ->
+    List.fold_left (fun acc_transition_list from_epsilon_state ->
       (**iterate over the epsilon closure of the to_state*)
-      List.fold_left (fun acc_nfa to_epsilon_state -> 
-        add_transition acc_nfa 
-        {
+      List.fold_left (fun acc_transition_list to_epsilon_state -> 
+        (**add a transition from each state in epsilon closure of from_state to epsilon closure of to_state*)
+        let new_transition = {
           from_state = from_epsilon_state;
           to_state = to_epsilon_state;
           label = transition.label;
-        }        
-      )
-    )  transition.to_state
-  )
-*)
+        } in
+        new_transition :: acc_transition_list
+      ) acc_transition_list (StateMap.find transition.to_state to_epsilon_closure_map)
+    )  acc_transition_list (StateMap.find transition.from_state to_epsilon_closure_map)
+  ) [] intermediate_nfa.transitions
+  in
 
+  let new_start_state = next_state in
+  let new_final_state = next_state + 1 in
 
+  (*Find all "start" states - we will have just one start state and epsilon transitions to the actual starts*)
+  let transition_list_with_start_epsilons = 
+    List.fold_left (fun acc_list state ->
+      let new_transition = {
+        from_state = new_start_state;
+        to_state = state;
+        label = Empty;
+      } 
+      in new_transition :: acc_list 
+    ) new_transition_list (StateMap.find intermediate_nfa.start_state to_epsilon_closure_map)
+  in
+
+  (*Find all "final" states - we will have just one actual final state and use epsilon transitions only here*)
+  let final_transition_list =
+    StateMap.fold (fun state epsilon_closure acc_list ->
+      if (List.mem intermediate_nfa.end_state epsilon_closure) then
+        let new_transition = {
+          from_state = state;
+          to_state = new_final_state;
+          label = Empty;
+        }
+        in
+        new_transition :: acc_list
+      else
+        acc_list
+    ) to_epsilon_closure_map transition_list_with_start_epsilons
+  in
+
+  let final_intermediate_nfa = {
+    start_state = new_start_state;
+    end_state = new_final_state;
+    transitions = final_transition_list;
+  }
+  in
+  final_intermediate_nfa, next_state + 2
+  
 (**nfa for accepting a single char*)
 let char_nfa c next_state =
   let start_state = next_state in
