@@ -8,17 +8,34 @@ type nfa_transition_label =
   | Empty (**epsilon transition*)
   | Character of char (**single char transition*)
   | CharRange of char * char (**all chars between start and end, inclusive*)
-  | CharList of char list  (**transition for each char in list*)
+
+module NFATransitionLabel = struct 
+
+  type t = nfa_transition_label
+
+  let compare a b =
+    match a,b with
+    | Empty, Empty -> 0
+    | Empty, _ -> -1
+    | _, Empty -> 1
+    | Character a_char, Character b_char -> Char.compare a_char b_char
+    | Character _, CharRange _ -> -1
+    | CharRange _, Character _ -> 1
+    | CharRange (a_start, a_end), CharRange (b_start, b_end) ->
+      let start_comp = Char.compare a_start b_start in
+      if start_comp = 0 then
+        Char.compare a_end b_end
+      else
+        start_comp
+end
+
+module LabelSet = Set.Make(NFATransitionLabel)
 
 let string_of_nfa_transition_label label =
   match label with
   | Empty -> "empty"
   | Character c -> String.of_char c
   | CharRange (c_start, c_end) -> (String.of_char c_start) ^ "-" ^ (String.of_char c_end)
-  | CharList c_list ->
-    List.fold_left (fun acc_str c ->
-      acc_str ^ " " ^ (String.of_char c)
-    ) "" c_list
 
 type nfa_transition = {
   from_state : nfa_state;
@@ -44,7 +61,7 @@ let transition_accepts_char transition c =
   | Empty -> (true, 0)
   | Character ch -> (c = ch, 1)
   | CharRange (ch_start, ch_end) -> (ch_start <= c && c <= ch_end, 1)
-  | CharList ch_list -> (List.mem c ch_list, 1)
+
 
 (**Intermediate NFA meant for building other NFAs out of - not great for parsing*)
 type intermediate_nfa = {
@@ -139,6 +156,20 @@ let compute_all_epsilon_closures nfa =
   List.fold_left (fun acc state ->
     StateMap.add state (build_epsilon_closure_for_state nfa state) acc
   ) StateMap.empty state_list
+
+(**given a state subset and the map of each state to its epsilon closure, return epsilon closure of the subset*)
+let compute_epsilon_closure state_set epsilon_closure_map =
+  (**For each state in the state_set*)
+  StateSet.fold (fun state acc_set_epsilon_closure  ->
+    let state_epsilon_closure_opt = StateMap.find_opt state epsilon_closure_map in
+    match state_epsilon_closure_opt with
+    | None -> acc_set_epsilon_closure
+    (**For each state in the epsilon closure of this state, add to total set epsilon_closure*)
+    | Some state_epsilon_closure -> List.fold_left (fun acc_epsilon_closure epsilon_closure_state ->
+      StateSet.add epsilon_closure_state acc_epsilon_closure
+      ) acc_set_epsilon_closure state_epsilon_closure
+  ) state_set StateSet.empty
+
 
 (**Traverse all the empty transitions to see if there is a path to the final state*)
 (**Note that an evil NFA could probably get this to loop forever, as is true of the other string matching functions*)
