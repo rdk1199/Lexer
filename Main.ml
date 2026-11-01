@@ -222,6 +222,28 @@ let () = expect_dfa_reject_all test_dfa_9 test_regex_9 [
 
 let () = print_endline "test 9 passed!"
 
+
+let test_regex_10 = "(a?b?c?d?\\?)*"
+let test_dfa_10 = construct_dfa (parse_regex_string test_regex_10)
+
+let () = expect_dfa_accept_all test_dfa_10 test_regex_10 [
+  "";
+  "?";
+  "ac?";
+  "abcd?";
+  "?abcd???";
+  "?a?b?c?d?";
+  "????";
+]
+
+let () = expect_dfa_reject_all test_dfa_10 test_regex_10 [
+  "a";
+  "aabcd?";
+  "a?b";
+]
+
+let () = print_endline "test 10 passed!"
+
 let () = print_endline "Regex->NFA tests passed!"
 
 
@@ -229,7 +251,7 @@ let () = print_endline "Regex->NFA tests passed!"
 let ident_regex = "([a-zA-Z_])([a-zA-Z0-9_])*"
 let ident_dfa = construct_dfa (parse_regex_string ident_regex)
 
-let int_regex = "[0-9][0-9]*"
+let int_regex = "-?[0-9][0-9]*"
 let int_dfa = construct_dfa (parse_regex_string int_regex)
 
 let whitespace_regex = "(|\\n|\\r|\\t| )*"
@@ -247,7 +269,7 @@ let classifiers = StringMap.add "WHITESPACE" whitespace_dfa classifiers
 
 let tokenizer = {keywords = keyword_map; classifiers = classifiers}
 
-let test_string_1 = " if 3 is greater than        5 then print 3 else print    asdf 5 "
+let test_string_1 = " if -3 is greater than        5 then print 3 else print    asdf 5 "
 
 let token_list_1 = tokenize_string tokenizer test_string_1
 let () = print_endline (token_list_to_string token_list_1)

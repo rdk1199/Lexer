@@ -241,6 +241,16 @@ let nfa_accepts_str nfa str =
   else
     (get_longest_nfa_match nfa str 0) = (String.length str)
 
+(**Given an nfa, return an nfa which accepts the empty string in addition to whatever was originally accepted*)
+let nfa_option (nfa : intermediate_nfa) =
+  let new_transition = {
+    from_state = nfa.start_state;
+    to_state = nfa.end_state;
+    label = Empty
+  }
+  in
+  (**Note this could add a redundant empty transition - this does not matter*)
+  add_transition nfa new_transition
 
 (**Thompson's construction union - next_state contains the next available state we can add*)
 let nfa_union  (nfa1 : intermediate_nfa) (nfa2 : intermediate_nfa) next_state =

@@ -186,6 +186,10 @@ let parse_regex_string regex =
         let char_nfa, new_next_nfa_state = nfa_for_char unescaped_char next_nfa_state in
         (**skip over this backslash and the char after it, since we processed them both*)
         parse_regex_string_rec regex (i+2) (char_nfa :: nfa_list) new_next_nfa_state
+      | '?' ->
+        (**optional - just pop the last nfa and replace it with the optional version*)
+        let optional_nfa = NFA.nfa_option (List.hd nfa_list) in
+        parse_regex_string_rec regex (i+1) (optional_nfa :: List.tl nfa_list) next_nfa_state
       | c ->
         (**default*)
         let char_nfa, new_next_nfa_state = nfa_for_char c next_nfa_state in
