@@ -11,6 +11,30 @@ type dfa = {
   transition_map : (dfa_transition list) NFA.TransitionMap.t
 }
 
+
+let string_of_dfa dfa =
+  let start_state_string = 
+  "start_state: " ^ (string_of_int dfa.start_state) ^ "\n"
+  in
+
+  let end_state_string = (NFA.StateSet.fold (fun state acc_str -> 
+    acc_str ^ (string_of_int state) ^ ", " 
+  ) dfa.end_states "end_states: ") ^ "\n"
+  in
+
+  let map_string = NFA.TransitionMap.fold (fun state transition_list acc ->
+    acc ^
+    "state: " ^ (string_of_int state) ^ "\n" ^
+    "transitions: " ^ 
+    (
+      List.fold_left ( fun acc_str transition ->
+        acc_str ^ " " ^ (NFA.string_of_nfa_transition transition) ^ ", "
+      ) "" transition_list
+    ) ^ "\n"
+    ) dfa.transition_map ""
+  in
+  start_state_string ^ end_state_string ^ map_string
+
 (**Helper - check if any set in set list is equal to set - returns (bool,  index)*)
 let set_list_contains_set set_list set =
   let index = List.find_index (fun elt -> NFA.StateSet.equal elt set) set_list in
@@ -35,15 +59,18 @@ let get_transition_label_set (nfa : NFA.nfa) state_set =
       ) acc_label_set transition_list
   ) state_set NFA.LabelSet.empty 
 
-(**return whether this state has a transition out with the given label, and the to state in that case*)
-let state_has_transition (nfa : NFA.nfa) state transition_label =
+(**return whether this state has transitions out with the given label, and the to states in that case*)
+let state_has_transitions (nfa : NFA.nfa) state transition_label =
   let transition_list_opt = NFA.StateMap.find_opt state nfa.transition_map in
   match transition_list_opt with
-  | None -> (false, -1)
+  | None -> []
   | Some transition_list -> 
-    List.fold_left (fun (acc_found, acc_state) transition ->
-      (acc_found || (transition.NFA.label = transition_label), transition.to_state)
-    ) (false, -1) transition_list
+    List.fold_left (fun acc_found transition ->
+      if transition.NFA.label = transition_label then
+        transition.to_state :: acc_found
+      else
+        acc_found
+    ) [] transition_list
 
 
 (**Get list of subsets that are reachable from this subset via some transition*)
@@ -58,11 +85,8 @@ let get_reachable_subsets nfa state_set epsilon_closure_map =
       (**iterate over all states, accumulate subset reachable from the original subset via this transition label*)
       let init_subset = 
       NFA.StateSet.fold (fun state acc_subset ->
-        let (has_transition, to_state) = state_has_transition nfa state label in
-        if has_transition then
-          NFA.StateSet.add to_state acc_subset
-        else
-          acc_subset
+        let reachable_from_state_via_transition = state_has_transitions nfa state label in
+        NFA.StateSet.union acc_subset (NFA.StateSet.of_list reachable_from_state_via_transition)
       ) state_set NFA.StateSet.empty
       in
       (**get epsilon closure of the set*)
@@ -91,11 +115,13 @@ let construct_dfa nfa =
     (** new_set_list @ current_finished_set_list  - we index from the back since we are pre-pending*)
     List.fold_left (fun (acc_new_subsets, current_index, acc_partial_transition_list) subset -> 
       let reachable_from_this_subset, label_list = get_reachable_subsets nfa subset epsilon_closure_map in
+
       (**The index of this subset (which will be the start state of this transition), starting from the end of*)
       (**The current finished sets size list*)
       let this_subset_index = (new_set_list_size - 1 - current_index) + current_finished_sets_size in
 
-      let new_partial_transition_list = List.fold_left (fun acc_transition_list label ->
+      (**We need to fold_right in order to maintain the order of the list*)
+      let new_partial_transition_list = List.fold_right (fun label acc_transition_list  ->
           let new_partial_transition : (NFA.nfa_transition) = {
             from_state = this_subset_index;
             to_state = -1;
@@ -103,20 +129,21 @@ let construct_dfa nfa =
           }
           in
           new_partial_transition :: acc_transition_list
-        ) [] label_list
+        ) label_list []
       in
       (
         reachable_from_this_subset @ acc_new_subsets, 
         current_index + 1, 
         new_partial_transition_list @ acc_partial_transition_list
       )
-    ) (new_set_list, 0, []) [] 
+    ) ([], 0, []) new_set_list 
     in
 
     (**Filter out previously encountered subsets and fill in partial transitions with their final to state,*)
     (**Which is the index of the to subset in the list*)
     (**We iterate over the partial transition list as well, so we process the head and pass the tail through to the next function*)
     let new_new_sets, new_transitions, _ = List.fold_left (fun (acc_new_sets, acc_new_transitions, partial_transition_list_tail) subset ->
+      
       let (in_acc_new_sets, acc_new_set_index) = set_list_contains_set acc_new_sets subset in
       let (in_new_set_list, new_set_list_index) = set_list_contains_set new_set_list subset in
       let (in_finished_set_list, finished_set_list_index) = set_list_contains_set current_finished_set_list subset in
@@ -125,22 +152,22 @@ let construct_dfa nfa =
         (**we index from the back of the list so indices stay consistent!*)
         let to_state = current_finished_sets_size - 1 - finished_set_list_index in
         let new_transition : (NFA.nfa_transition) = {(List.hd partial_transition_list_tail) with to_state = to_state;} in
-        (acc_new_sets, new_transition :: acc_new_transitions, List.tl partial_transition_list)
+        (acc_new_sets, new_transition :: acc_new_transitions, List.tl partial_transition_list_tail)
       else if in_new_set_list then
         let to_state = new_set_list_size - 1 - new_set_list_index + current_finished_sets_size in
         let new_transition : (NFA.nfa_transition) = {(List.hd partial_transition_list_tail) with to_state = to_state; } in
-        (acc_new_sets, new_transition :: acc_new_transitions, List.tl partial_transition_list)
+        (acc_new_sets, new_transition :: acc_new_transitions, List.tl partial_transition_list_tail)
       else if in_acc_new_sets then
         let acc_new_sets_size = List.length acc_new_sets in
         let to_state = acc_new_sets_size - 1 - acc_new_set_index + new_set_list_size + current_finished_sets_size in
         let new_transition : (NFA.nfa_transition) = {(List.hd partial_transition_list_tail) with to_state = to_state;} in
-        (acc_new_sets, new_transition :: acc_new_transitions, List.tl partial_transition_list)
+        (acc_new_sets, new_transition :: acc_new_transitions, List.tl partial_transition_list_tail)
       else
         (**This is a new subset - add it onto the list*) 
         let acc_new_sets_size = List.length acc_new_sets in
         let to_state = acc_new_sets_size + new_set_list_size + current_finished_sets_size in
         let new_transition : (NFA.nfa_transition) = {(List.hd partial_transition_list_tail) with to_state = to_state;} in
-        (subset::acc_new_sets, new_transition :: acc_new_transitions, List.tl partial_transition_list)
+        (subset::acc_new_sets, new_transition :: acc_new_transitions, List.tl partial_transition_list_tail)
     ) ([], [], partial_transition_list) potential_new_new_sets
 
     in
@@ -164,7 +191,7 @@ let construct_dfa nfa =
         (NFA.StateSet.add index final_state_set_acc, index - 1)
       else
         (final_state_set_acc, index - 1)
-    ) (NFA.StateSet.empty, List.length subset_states) subset_states
+    ) (NFA.StateSet.empty, (List.length subset_states) - 1) subset_states
   in
 
   (**Build the transition map from the transition list*)
@@ -178,7 +205,6 @@ let construct_dfa nfa =
   ) NFA.TransitionMap.empty transition_list
 
   in 
-  
   {
     start_state = 0;
     end_states = final_states;
@@ -186,5 +212,41 @@ let construct_dfa nfa =
   }
 
 
+(**Feed a string through a DFA starting from index i and get the maximum length that will be accepted*)
+(**Returns length, so if j is returned then up to i + j - 1 is accepted*)
+let get_longest_dfa_match dfa str i =
+  (*j = index in the string to check NEXT (not yet processed), current_max = length of longest accepted prefix*)
+  let rec get_longest_dfa_match_rec dfa str j current_max curr_state =
 
+    (**if we are in a final state, then the string "[i,j)" was accepted, so get a new max*)
+    let new_max = if NFA.StateSet.mem curr_state dfa.end_states  then Int.max (j-i) current_max else current_max in
+    
+    if j >= String.length str then
+      (**We are at the end of the string and there are no epsilon transitions in a DFA, so finish*)
+      new_max
+    else
+      let opt_transition_list = NFA.TransitionMap.find_opt curr_state dfa.transition_map in
+      match opt_transition_list with
+      (**Nowhere to proceed - the best so far is what we return*)
+      | None -> new_max
+      | Some transition_list ->
+        List.fold_left (fun acc transition ->
+            (**There should be at most one accepting transition for this character in a DFA, and no emptys!*)
+            let (accepts, num_accepted) = 
+              (**If there is a next char to process, we can proceed down any accepting transition*)
+              NFA.transition_accepts_char transition str.[j]
+            in
+            if accepts then
+              Int.max acc
+              (**proceed down this transition, since it's a match*)
+              (get_longest_dfa_match_rec dfa str (j + num_accepted) new_max transition.to_state)
+            else
+              acc
+        ) new_max transition_list
+  in
+  (**Start current max accepted at -1*)
+  get_longest_dfa_match_rec dfa str i (-1) dfa.start_state 
+
+let dfa_accepts_str dfa str = 
+  (get_longest_dfa_match dfa str 0) = String.length str
 

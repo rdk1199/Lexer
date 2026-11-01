@@ -31,6 +31,11 @@ end
 
 module LabelSet = Set.Make(NFATransitionLabel)
 
+let string_of_state_set state_set = 
+  StateSet.fold ( fun state str ->
+    str ^ " " ^ (string_of_int state) ^ " "
+  ) state_set ""
+
 let string_of_nfa_transition_label label =
   match label with
   | Empty -> "empty"
