@@ -244,6 +244,27 @@ let () = expect_dfa_reject_all test_dfa_10 test_regex_10 [
 
 let () = print_endline "test 10 passed!"
 
+
+let test_regex_11 = "(p([abd]*[efg]*)*)?"
+let test_dfa_11 = construct_dfa (parse_regex_string test_regex_11)
+
+let () = expect_dfa_accept_all test_dfa_11 test_regex_11 [
+  "";
+  "p";
+  "pefgabd";
+  "paaaaaabbbdddeeeefffgggabdefg";
+  "pabdabdabd"
+]
+
+let () = expect_dfa_reject_all test_dfa_11 test_regex_11 [
+  "a";
+  "p?";
+  "ppabdefgabd";
+]
+
+
+let () = print_endline "test 11 passed!"
+
 let () = print_endline "Regex->NFA tests passed!"
 
 

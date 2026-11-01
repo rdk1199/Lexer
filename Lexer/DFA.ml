@@ -11,7 +11,6 @@ type dfa = {
   transition_map : (dfa_transition list) NFA.TransitionMap.t
 }
 
-
 let string_of_dfa dfa =
   let start_state_string = 
   "start_state: " ^ (string_of_int dfa.start_state) ^ "\n"
@@ -211,6 +210,8 @@ let construct_dfa nfa =
     transition_map = final_transition_map;
   }
 
+let dfa_from_regex regex =
+  construct_dfa (Regex.parse_regex_string regex)
 
 (**Feed a string through a DFA starting from index i and get the maximum length that will be accepted*)
 (**Returns length, so if j is returned then up to i + j - 1 is accepted*)
