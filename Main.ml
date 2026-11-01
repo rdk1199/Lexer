@@ -270,25 +270,11 @@ let () = print_endline "Regex->NFA tests passed!"
 
 
 let ident_regex = "([a-zA-Z_])([a-zA-Z0-9_])*"
-let ident_dfa = construct_dfa (parse_regex_string ident_regex)
-
 let int_regex = "-?[0-9][0-9]*"
-let int_dfa = construct_dfa (parse_regex_string int_regex)
-
 let whitespace_regex = "(|\\n|\\r|\\t| )*"
-let whitespace_dfa = construct_dfa (parse_regex_string whitespace_regex)
 
-let keyword_map = StringMap.empty
-let keyword_map = StringMap.add "if" "IF" keyword_map
-let keyword_map = StringMap.add "then" "THEN" keyword_map
-let keyword_map = StringMap.add "else" "ELSE" keyword_map
+let tokenizer = build_tokenizer [("IF", "if"); ("THEN", "then"); ("ELSE", "else");] [("IDENT", ident_regex); ("INTEGER", int_regex); ("WHITESPACE", whitespace_regex);]
 
-let classifiers = StringMap.empty
-let classifiers = StringMap.add "IDENT" ident_dfa classifiers
-let classifiers = StringMap.add "INTEGER" int_dfa classifiers
-let classifiers = StringMap.add "WHITESPACE" whitespace_dfa classifiers
-
-let tokenizer = {keywords = keyword_map; classifiers = classifiers}
 
 let test_string_1 = " if -3 is greater than        5 then print 3 else print    asdf 5 "
 

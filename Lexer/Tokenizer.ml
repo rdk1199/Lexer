@@ -20,6 +20,21 @@ type tokenizer = {
   classifiers : DFA.dfa StringMap.t;
 }
 
+(**Takes a list of (TOKEN_TYPE, keyword) pairs and a list of (TOKEN_TYPE, regex) pairs and returns a tokenizer*)
+let build_tokenizer keyword_pair_list regex_classifier_list =
+  let keyword_map = List.fold_left ( fun acc_map (keyword_type, keyword) ->
+    StringMap.add keyword keyword_type acc_map
+  ) StringMap.empty keyword_pair_list
+  in
+
+  let classifier_map = List.fold_left (fun acc_map (token_type, regex) -> 
+    let dfa = DFA.dfa_from_regex regex in
+    StringMap.add token_type dfa acc_map
+  ) StringMap.empty regex_classifier_list
+  in
+
+  {keywords = keyword_map; classifiers = classifier_map}
+
 (*Takes a string and returns a list of tokens*)
 (*Tokenization algorithm is as follows: *)
 (*The longest accepted prefix of str with respect to each DFA is computed, then*)
