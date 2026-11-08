@@ -64,7 +64,7 @@ let tokenize_string tokenizer str =
     in
     tokenize_string_from (i + token_length) (token :: token_list)
   in
-  (**We prepend tokens to the list, so it must be reversed at the end*)
-  List.rev (tokenize_string_from 0 [])
+  (**We prepend tokens to the list, so it must be reversed at the end - always have an EOF token at the end*)
+  List.rev ({token_type = "$EOF$"; lexeme = "$EOF$"} :: (tokenize_string_from 0 []))
 
   
