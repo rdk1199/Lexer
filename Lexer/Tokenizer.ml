@@ -55,14 +55,19 @@ let tokenize_string tokenizer str =
         (max_length, token_type_acc)
     ) tokenizer.classifiers (-1, "")
     in
-    let () = assert(token_length > 0) in
-    let lexeme = String.sub str i token_length in
-    let token = 
-      match (StringMap.find_opt lexeme tokenizer.keywords) with
-      | None -> {token_type = token_type; lexeme = lexeme}
-      | Some keyword -> {token_type = keyword; lexeme = lexeme}
-    in
-    tokenize_string_from (i + token_length) (token :: token_list)
+    if token_length > 0 then
+      let () = assert(token_length > 0) in
+      let lexeme = String.sub str i token_length in
+      let token = 
+        match (StringMap.find_opt lexeme tokenizer.keywords) with
+        | None -> {token_type = token_type; lexeme = lexeme}
+        | Some keyword -> {token_type = keyword; lexeme = lexeme}
+      in
+      tokenize_string_from (i + token_length) (token :: token_list)
+    else
+      let () = print_endline ("Tokenization failed here:\n") in
+      let () = print_endline (String.sub str i ((String.length str) - i)) in
+      assert(false);
   in
   (**We prepend tokens to the list, so it must be reversed at the end - always have an EOF token at the end*)
   List.rev ({token_type = "$EOF$"; lexeme = "$EOF$"} :: (tokenize_string_from 0 []))
