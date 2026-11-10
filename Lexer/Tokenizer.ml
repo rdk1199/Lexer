@@ -35,6 +35,22 @@ let build_tokenizer keyword_pair_list regex_classifier_list =
 
   {keywords = keyword_map; classifiers = classifier_map}
 
+(**check for a keyword starting at i - returns length of longest keyword match found*)
+let check_for_keyword tokenizer str i =
+  let str_length = String.length str in
+  StringMap.fold (fun keyword _ (longest_found, longest_keyword) ->
+    let keyword_length = String.length keyword in
+    if keyword_length + i >= str_length then
+      (longest_found, longest_keyword)
+    else if (String.sub str i keyword_length) = keyword then
+      if(longest_found < keyword_length) then
+        (keyword_length, keyword)
+      else
+        (longest_found, longest_keyword)
+    else
+      (longest_found, longest_keyword)
+  ) tokenizer.keywords (0, "")
+
 (*Takes a string and returns a list of tokens*)
 (*Tokenization algorithm is as follows: *)
 (*The longest accepted prefix of str with respect to each DFA is computed, then*)
@@ -65,9 +81,15 @@ let tokenize_string tokenizer str =
       in
       tokenize_string_from (i + token_length) (token :: token_list)
     else
-      let () = print_endline ("Tokenization failed here:\n") in
-      let () = print_endline (String.sub str i ((String.length str) - i)) in
-      assert(false);
+      (**Handle unrecognized keyword token*)
+      let keyword_length, keyword = check_for_keyword tokenizer str i in
+      if keyword_length > 0 then
+        let token = {token_type = StringMap.find keyword tokenizer.keywords; lexeme = keyword} in
+        tokenize_string_from (i + keyword_length) (token :: token_list)
+      else
+        let () = print_endline ("Tokenization failed here:\n") in
+        let () = print_endline (String.sub str i ((String.length str) - i)) in
+        assert(false);
   in
   (**We prepend tokens to the list, so it must be reversed at the end - always have an EOF token at the end*)
   List.rev ({token_type = "$EOF$"; lexeme = "$EOF$"} :: (tokenize_string_from 0 []))
