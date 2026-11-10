@@ -40,7 +40,7 @@ let check_for_keyword tokenizer str i =
   let str_length = String.length str in
   StringMap.fold (fun keyword _ (longest_found, longest_keyword) ->
     let keyword_length = String.length keyword in
-    if keyword_length + i >= str_length then
+    if keyword_length + i > str_length then
       (longest_found, longest_keyword)
     else if (String.sub str i keyword_length) = keyword then
       if(longest_found < keyword_length) then
